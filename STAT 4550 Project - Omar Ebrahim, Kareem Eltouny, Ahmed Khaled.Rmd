@@ -1,0 +1,382 @@
+---
+title: "STAT 4550 Project"
+author: "Omar Ebrahim, Kareem El Touny, Ahmed Khaled"
+date: "2024-05-06"
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+# Importing the libraries
+```{r}
+library(ggplot2)
+library(ggfortify) 
+library(forecast) 
+library(zoo)
+library(dplyr)
+library(readr)
+library(tseries)
+library(lmtest)
+```
+# UKDriverDeaths is a time series giving the monthly totals of car drivers in Great Britain killed or seriously injured Jan 1969 to Dec 1984. Compulsory wearing of seat belts was introduced on 31 Jan 1983. We chose this dataset because it is variable by time, and there seems to be a trend which allows us to analyze it in the upcoming data visualization techniques.
+
+```{r}
+
+data(Seatbelts)
+head(Seatbelts)
+Seatbelts <- as.data.frame(Seatbelts)
+Seatbelts
+Seatbelts <- ts(Seatbelts, start = 1969, frequency=12)
+SeatbeltsTS <- Seatbelts[,1]
+frequency(SeatbeltsTS)
+```
+```{r}
+summary(SeatbeltsTS) 
+mean(SeatbeltsTS) 
+sd(SeatbeltsTS) 
+min(SeatbeltsTS) 
+max(SeatbeltsTS)
+SeatbeltsTS
+```
+```{r}
+autoplot(SeatbeltsTS) + labs(x= "Date", y= "Driver Deaths", title="Road Casualties in Great Britain (1969 - 1984)") + theme_minimal()
+```
+| `Over the period from 1969 to 1984, there is a noticeable downward trend in the number of driver deaths. While the overall trend is downward, there is significant variation present.` |
+|---------------------------|
+```{r}
+decomposedres <- decompose(SeatbeltsTS)
+plot(decomposedres)
+```
+|`In the observed section, there is a downward trend over the years particularly for the mean, the fluctuations in the variation remain the same. Trend: The trend line shows a general decline in driver deaths over the period, especially from  early 1970s to 1980. Around 1980, there appears to be a slight increase or leveling off. Seasonal: This plot shows a clear and consistent seasonal pattern. it indicates that there are specific times within the year when driver deaths are predictably higher or lower, likely due to factors such as weather conditions, holidays, and other cyclical events. Random: residuals appear stable with some variability, but there are random fluctuations.`|
+|---------------------------|
+```{r}
+data(Seatbelts)
+Sb <- Seatbelts[,1]
+class(Sb)
+summary(Sb)
+plot(Sb,xlab="Date", ylab = "Driver Deaths",main="Road Casualties in Great Britain (1969 - 1984)")
+autoplot(Sb) + labs(x ="Date", y = "Driver Deaths", title="Road Casualties in Great Britain (1969 - 1984)") 
+boxplot(Sb~cycle(Sb),xlab="Date", ylab = "Driver Deaths" ,main ="Road Casualties in Great Britain (1969 - 1984)")
+
+
+decomposeTS <- decompose(Sb, "multiplicative")
+autoplot(decomposeTS)
+```
+| `In the data panel for the last graph, there is an upward trend, then followed by a downward trend, with clear seasonal fluctuations throughout the period. As for the trend panel, there is a visible increase from 1969 to around 1977, and then a decrease until 1984. For the seasonal panel, the seasonal pattern is pretty consistent over the years. Finally, the remainder panel in the bottom panel displays noise after removing the trend and seasonal components.` |
+|---------------------------|
+### Durbin-Watson (DW) Test:
+
+```{r}
+library(lmtest)
+lm_model <- lm(Sb ~ 1)
+dwtest(lm_model)
+```
+
+| **`The DW statistic is from 0 to 4. A value around 2 is no autocorrelation, less than 2 positive autocorrelation, greater than 2 negative autocorrelation. In this case, our DW statistic is 0.74 which means strong positive autocorrelation in the residuals.
+The p-value is extremely small, less than 2.2e-16 is almost 0, so test is highly significant. With such a low p-value, we reject the null hypothesis of no autocorrelation and accept the alternative hypothesis that there is significant positive autocorrelation in the residuals. Alternative Hypothesis also suggests that there is positive autocorrelation.`** |
+|-------------------------------|
+
+### Dickey-Fuller (DF) Test:
+
+```{r}
+# Load necessary package if not already loaded
+library(tseries)
+
+# Perform Dickey-Fuller test
+adf.test(Sb)
+```
+
+| `For Dickey-Fuller, the test statistic  -6.1975 is quite negative and shows strong evidence against the null hypothesis of unit root. Next, lag order of 5 indicates that five lagged differences of the time series were included in the test to account for autocorrelation. Given small p-value, we reject null hypothesis that series has a unit root. Moreover, results suggest that the our time series is stationary. This means that mean and variance do not change over time.` |
+|---------------------------|
+
+### Augmented Dickey-Fuller (ADF) Test:
+
+```{r ADF Test}
+adf_result <- adf.test(Sb)
+
+print(adf_result)
+```
+
+| `The Augmented Dickey-Fuller test results show that the series is stationary, meaning that the mean & variance remain constant over time. -6.1975 is a highly negative test statistic that displays strong evidence against null hypothesis of unit root. Also, this confirms that the series does not show a unit root, hence no further transformation is needed to achieve stationarity.` |
+|---------------------------|
+
+### Autocorrelation Function (ACF):
+
+```{r}
+library(ggplot2)  # Load the ggplot2 package for plotting
+library(stats)    # Load the stats package for acf function
+
+# Calculate autocorrelation function (ACF)
+acf_result <- acf(Sb, plot = FALSE)
+
+# Extract lag and autocorrelation values
+lags <- acf_result$lag
+acf_values <- acf_result$acf
+
+# Create data frame
+acf_df <- data.frame(lag = lags, acf = acf_values)
+
+# Plot ACF using ggplot2 with white background
+p5<- ggplot(acf_df, aes(x = lag, y = acf)) +
+  geom_bar(stat = "identity", fill = "#0099f9") +
+  labs(title = "Correlogram of Road Casualties in Great Britain (1969 - 1984)",
+       x = "Lag", y = "Autocorrelation") +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color = "gray"),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        text = element_text(color = "black"))
+print(p5)
+```
+
+| `Significant positive autocorrelations at lower lags suggest that the road casualties data exhibit persistence which means that high casualty periods are likely followed by similar high casualty periods. Next, the slight negative autocorrelations at higher lags indicate cyclic behavior although they confirm any specific periodic pattern. Finally, noticeable peak at lag 12 strongly suggests a yearly seasonal effect, which is common in many types of time series data.` |
+|---------------------------|
+
+### Partial Autocorrelation Function (PACF):
+
+```{r}
+
+library(ggplot2)  # Load the ggplot2 package for plotting
+library(stats)    # Load the stats package for acf function
+
+# Calculate autocorrelation function (ACF)
+pacf_result <- pacf(Sb, plot = FALSE)
+
+# Extract lag and autocorrelation values
+lags <- pacf_result$lag
+pacf_values <- pacf_result$acf
+
+# Create data frame
+pacf_df <- data.frame(lag = lags, pacf = pacf_values)
+
+# Plot ACF using ggplot2 with white background
+p6<- ggplot(pacf_df, aes(x = lag, y = pacf)) +
+  geom_bar(stat = "identity", fill = "#0099f9") +
+  labs(title = "Correlogram of Road Casualties in Great Britain (1969 - 1984)",
+       x = "Lag", y = "Autocorrelation") +
+  theme_minimal() +
+  theme(panel.background = element_rect(fill = "white"),
+        plot.background = element_rect(fill = "white"),
+        panel.grid.major = element_line(color = "gray"),
+        panel.grid.minor = element_blank(),
+        axis.line = element_line(color = "black"),
+        text = element_text(color = "black"))
+print(p6)
+```
+
+| `The plot for road shows significant positive partial autocorrelations at lag 1 which means there is a strong direct relationship between driver deaths in consecutive periods. The positive partial autocorrelations at lags 2 & 3 suggest a decreasing but present direct relationship. Next, slight negative partial autocorrelations at lags 4 and 5 indicate weak inverse relationship. Finally, a positive partial autocorrelation at lag 12, suggesting a yearly seasonal effect similar to the autocorrelation plot.` |
+|---------------------------|
+
+# \newpage
+
+## Modeling and Forecasting TS Data
+
+To determine the optimal order of an ARIMA model using different information criteria such as AIC (Akaike Information Criterion), BIC (Bayesian Information Criterion), FPE (Final Prediction Error), and HQ (Hannan-Quinn Criterion)
+
+The following script will loop through different combinations of p (AR order), d (differencing), and q (MA order) parameters, fit ARIMA models for each combination, compute AIC, BIC, FPE, and HQ criteria, and then find the optimal order based on each criterion.
+
+```{r loop of order of ARIMA using AIC BICD FPE & HQ.}
+# Load necessary packages
+library(forecast)
+
+# Define the time series data
+# Replace 'AP' with your actual time series data
+ts_data <- Sb
+
+# Define the maximum values for p, d, and q
+max_p <- 3  # Maximum value for AR order
+max_d <- 1  # Maximum value for differencing
+max_q <- 3  # Maximum value for MA order
+
+# Initialize matrices to store AIC, BIC, FPE, and HQ values
+AIC_matrix <- matrix(NA, nrow = max_p, ncol = max_q)
+BIC_matrix <- matrix(NA, nrow = max_p, ncol = max_q)
+FPE_matrix <- matrix(NA, nrow = max_p, ncol = max_q)
+HQ_matrix <- matrix(NA, nrow = max_p, ncol = max_q)
+
+# Loop through different combinations of p, d, and q parameters
+for (p in 1:max_p) {
+  for (q in 1:max_q) {
+    for (d in 0:max_d) {
+      # Skip combinations that result in non-invertible models
+      if (p + d + q > 0) {
+        tryCatch({
+          # Fit ARIMA model for the current combination of p, d, and q
+          arima_model <- arima(ts_data, order = c(p, d, q))
+          
+          # Compute AIC, BIC, FPE, and HQ criteria
+          AIC_matrix[p, q] <- AIC(arima_model)
+          BIC_matrix[p, q] <- BIC(arima_model)
+          FPE_matrix[p, q] <- logLik(arima_model) * (-2 / length(ts_data))
+          HQ_matrix[p, q] <- log(length(ts_data)) * (p + q + 1) - 2 * logLik(arima_model)
+        }, error = function(e) {
+          next
+        })
+      }
+    }
+  }
+}
+
+# Find the optimal order based on each criterion
+optimal_order_AIC <- which(AIC_matrix == min(AIC_matrix), arr.ind = TRUE)
+optimal_order_BIC <- which(BIC_matrix == min(BIC_matrix), arr.ind = TRUE)
+optimal_order_FPE <- which(FPE_matrix == min(FPE_matrix), arr.ind = TRUE)
+optimal_order_HQ <- which(HQ_matrix == min(HQ_matrix), arr.ind = TRUE)
+
+# Print the optimal orders
+cat("Optimal Order (AIC):", optimal_order_AIC, "\n")
+cat("Optimal Order (BIC):", optimal_order_BIC, "\n")
+cat("Optimal Order (FPE):", optimal_order_FPE, "\n")
+cat("Optimal Order (HQ):", optimal_order_HQ, "\n")
+```
+
+| `The AIC, BIC, and HQ all suggest the same model that is ARIMA(2,0,2), which makes it a potentially robust choice for the model. However, FPE criterion suggests an MA(3) component instead of MA(2). This indicates that while the simpler ARIMA(2, 0, 2) model is likely sufficient, we might have to consider an extra MA term which results in ARIMA(2, 0, 3). Therefore, it might improve predictive performance for the seatbelt dataset.` |
+|---------------------------|
+
+## \newpage
+
+## Automatic **ARIMA**
+
+ARIMA forecasting captures the autocorrelation in a series and models it directly. Autocorrelation are values that show how a series relates to itself over a time series. ARIMA models are typical for outperforming exponential smoothing methods when historical data is long and non-volatile.
+
+```{r Automatic ARIMA}
+# Load the forecast package for ARIMA modeling
+library(forecast)
+
+# Fit automatic ARIMA model
+auto_arima_model <- auto.arima(Sb)
+
+# Print model summary
+print(summary(auto_arima_model))
+
+```
+
+| `The ARIMA(1,0,2)(0,1,1)[12] model with drift (adds constant trend to the model) is well-fitted to the data because it captures both the seasonal and non-seasonal components. Moreover, the error measures suggest that the model forecasts well with errors being reasonably small relative to the data's scale, Finally, low ACF1 indicates that the residuals do not exhibit significant autocorrelation, implying that the model has adequately captured the underlying structure in the data.` |
+|---------------------------|
+
+## \newpage
+
+## Residuals Diagnostics
+
+To diagnose the residuals of an ARIMA model, you can use various techniques including the Augmented Dickey-Fuller (ADF) test or inspecting the Autocorrelation Function (ACF) and Partial Autocorrelation Function (PACF) of the residuals. In these plots, if the autocorrelation coefficients of the residuals are significant at certain lags (outside the blue shaded region in the plot), it indicates that the residuals exhibit some patterns that are not captured by the model.
+
+### Augmented Dickey-Fuller (ADF) Test for Residuals:
+
+```{r}
+# Perform Augmented Dickey-Fuller test for residuals
+adf.test(residuals(auto_arima_model))
+```
+
+| `Since p-value= 0.01 < 0.05, we reject the null hypothesis that our model is non-stationary then the model is stationary. ` |
+|---------------------------|
+
+### (ACF) and (PACF) of Residuals:
+
+```{r}
+# Plot Autocorrelation Function (ACF) of residuals
+acf(residuals(auto_arima_model))
+
+# Plot Partial Autocorrelation Function (PACF) of residuals
+pacf(residuals(auto_arima_model))
+```
+
+| `Both ACF amd PACF plots show cutt-off throughout, which means there is no sign of autocorrelation in this model.` |
+|---------------------------|
+
+```{r Residuals Diagnostics}
+p6<-tsdiag(auto_arima_model)
+
+print(p6)
+```
+
+| `Standardized Residuals plot indicate having outliers which can be handled by applying some transformation or data cleaning such as checking for some measurement errors. In the ACF of residuals, there are no sign of AutoCorrelation. Finally, the Ljung Box tests for autocorrelation and since all p-values are greater than 0.05, this further proves our conclusion of no autocorrelation from the ACF plot.` |
+|---------------------------|
+
+#### Normality
+
+To test the normality of residuals from an ARIMA model, you can use:
+
+1.  **Shapiro-Wilk Test**:
+
+```{R Shapiro-Wilk test}
+# Perform Shapiro-Wilk test for normality of residuals
+shapiro.test(residuals(auto_arima_model))
+```
+
+| `Since the p-value is less than 0.05, we reject the null hypothesis that the residuals are normally distributed. Residuals of the ARIMA model show significant deviation from normality. While our model may perform well, the lack of normality in residuals suggests taking caution in interpreting prediction intervals.` |
+|---------------------------|
+
+2.  **Kolmogorov-Smirnov Test**:
+
+```{R Kolmogorov-Smirnov test}
+# Perform Kolmogorov-Smirnov test for normality of residuals
+ks.test(residuals(auto_arima_model), "pnorm", mean = mean(residuals(auto_arima_model)), sd = sd(residuals(auto_arima_model)))
+```
+| `p-value is greater than 0.05 then we fail to reject H0 that states that the data follows a specific distribution which can be a normal distribution according to Shapiro-Wilk test. In that case we can check the Q-Q and histogram of residuals plot to further confirm our analysis.` |
+|---------------------------|
+
+3.  **Visual Inspection**:
+
+```{R Histogram and Q-Q Plots}
+# Histogram of residuals
+hist(residuals(auto_arima_model), main = "Histogram of Residuals")
+
+# Q-Q plot of residuals
+qqnorm(residuals(auto_arima_model))
+qqline(residuals(auto_arima_model))
+```
+
+In the Q-Q plot, if the residuals follow a normal distribution, the points should approximately fall along the diagonal line.
+
+By performing these tests and visual inspections, you can assess whether the residuals from your ARIMA model are approximately normally distributed.
+
+| `While both plots don't indicate a perfect normal distribution, the deviations from the 45 degree line in the Q-Q plot is not that significant to indicate that our model is not normally distributed. In addition, the histogram of residuals has the bell-shape distribution which further helps our anlysis that the residuals are normally distributed.` |
+|---------------------------|
+#### Outliers check
+
+To check for outliers in the residuals of an ARIMA model, you can use
+
+1.  **Boxplot**:
+
+```{R Boxplot}
+# Box-plot of residuals
+boxplot(resid(auto_arima_model), main = "Boxplot of Residuals")
+```
+
+| `The boxplot indicates that we have 7 outliers which further verify the standardized residuals coclusion that outliers are present and more modifications to our model are needed to resolve this issue.` |
+|---------------------------|
+
+#### Ljung--Box test
+
+The Ljung-Box test is a statistical test used to check for the presence of autocorrelation in a time series at various lags.
+
+```{R}
+# Load necessary package
+library(stats)
+
+# Perform Ljung-Box test for autocorrelation of residuals
+Box.test(residuals(auto_arima_model), lag = 3)
+```
+
+| `Ljung Box test confirms that there is no autocorrelation since p-value is greater than 0.05 fail to reject H0: no autocorrelation` |
+|---------------------------|
+
+## \newpage
+
+## ARIMA Forecasting
+
+```{r ARIMA forecast}
+Arimaforecast <- forecast(auto_arima_model, h=12)
+plot(Arimaforecast)
+p6<-autoplot(Arimaforecast)
+
+forecastSb <- forecast(auto_arima_model, level = c(95), h = 36)
+p7<-autoplot(forecastSb)
+print(p7)
+```
+
+| `The ARIMA forecast appears to capture the overall trend in the time series data, showing a gradual increase in values over time. However, there are fluctuations and variations in the forecasted values, suggesting some level of uncertainty in the predictions. It is important to consider the confidence interval and potential sources of error in the forecast when interpreting and making decisions based on these predictions. Further evaluation of the forecast accuracy using statistical metrics and comparison with actual values is recommended to assess the reliability of the ARIMA model's forecasts.` |
+|---------------------------|
